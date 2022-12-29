@@ -3,7 +3,7 @@ An automatic instance switcher wrapping Mastodon queries with [Mastodon.py](http
 
 As mastodon works as a federated network of instances, information on a specific user (e.g. on their followers) 
 may be incomplete at a specific instance, which isn't their home instance. In order to obtain the most complete
-information (and perhaps reduce your quota usage on individual instances), flipton automatically automatically 
+information (and perhaps reduce your quota usage on individual instances), flipton automatically 
 sends requests to the respective home instances of the specified user.
 
 # Setup
