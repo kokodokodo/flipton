@@ -10,6 +10,7 @@ from pathlib import Path
 from urllib3.util.url import parse_url
 from mastodon import Mastodon
 from mastodon.utility import AttribAccessList
+from mastodon.errors import MastodonError
 
 # Methods not associated to a logged in user.
 # From API version 3.5.5
@@ -56,6 +57,10 @@ MASTODON_PUBLIC_API = \
  'verify_minimum_version']
 
 APP_NAME = "flipton"
+
+
+class FliptonError(Exception):
+    """ Flipton error class """
 
 
 class MastodonInstanceSwitcher(object):
@@ -224,7 +229,7 @@ def generate_account_method(method_name):
                     print(f"MastodonInstanceSwitcher.{method_name}() Found 'id' in method arguments, but not 'acct'.\n" 
                           "All 'account_'-methods of MastodonInstanceSwitcher require a parameter 'acct'.\n"
                           "You may pass a numerical user-id via 'acct' on the home instance.")
-                raise Exception(f"MastodonInstanceSwitcher.'{method_name}()' requires parameter 'acct'.")
+                raise FliptonError(f"MastodonInstanceSwitcher.'{method_name}()' requires parameter 'acct'.")
             if acct[0]=="@":
                 # Remove @-prefix
                 acct = acct[1:]
@@ -234,10 +239,10 @@ def generate_account_method(method_name):
             elif len(asplit) == 2:
                 user, host = asplit
             else:
-                raise Exception(f"Error: MastodonInstanceSwitcher.{method_name}(), parameter 'acct' must have the format 'user@host' (or 'user' for active instance)")
+                raise FliptonError(f"Error: MastodonInstanceSwitcher.{method_name}(), parameter 'acct' must have the format 'user@host' (or 'user' for active instance)")
             if host is None:
                 if self.active_host is None:
-                    raise Exception(f"Error: MastodonInstanceSwitcher.{method_name}(), parameter 'acct' must have the format 'user@host' if no active client is present")
+                    raise FliptonError(f"Error: MastodonInstanceSwitcher.{method_name}(), parameter 'acct' must have the format 'user@host' if no active client is present")
                 else:
                     host = self.active_host
             else:
@@ -250,15 +255,15 @@ def generate_account_method(method_name):
             acct_id = self.get_acct_id(user, host)
             if acct_id is None:
                 self.active_host = orig_host
-                raise Exception(f"MastodonInstanceSwitcher.{method_name}(): Failed to retrieve id for account '{acct}'")
+                raise FliptonError(f"MastodonInstanceSwitcher.{method_name}(): Failed to retrieve id for account '{acct}'")
         
         try:
             if method_name == "account_lookup":
                 response = self._call_client("account", **{**{"id": acct_id}, **kwargs})
             else:
                 response = self._call_client(method_name, **{**{"id": acct_id}, **kwargs})
-        except Exception as e:
-            raise Exception(f"MastodonInstanceSwitcher.{method_name}(): Request for '{acct}' failed with error: %s"%str(e))
+        except MastodonError as e:
+            raise FliptonError(f"MastodonInstanceSwitcher.{method_name}(): Request for '{acct}' failed with error: %s"%str(e))
         finally:
             self.active_host = orig_host
         return response
@@ -276,20 +281,20 @@ def generate_instance_method(method_name):
             host = self.previous_host
         elif host is None:
             if self.active_host is None:
-                raise Exception(f"MastodonInstanceSwitcher.{method_name}() requires parameter 'host' if no active host is designated.")
+                raise FliptonError(f"MastodonInstanceSwitcher.{method_name}() requires parameter 'host' if no active host is designated.")
             else:
                 host = self.active_host
         self.set_host(host)
         
         if self.active_host is None:
             self.active_host = orig_host
-            raise Exception(f"MastodonInstanceSwitcher.{method_name}(): Failed to connect to host '{host}'")
+            raise FliptonError(f"MastodonInstanceSwitcher.{method_name}(): Failed to connect to host '{host}'")
         
         # Call client method
         try:
             response = self._call_client(method_name, **kwargs)
-        except Exception as e:
-            raise Exception(f"MastodonInstanceSwitcher.{method_name}(): Request on '{host}' failed with error: %s"%str(e))
+        except MastodonError as e:
+            raise FliptonError(f"MastodonInstanceSwitcher.{method_name}(): Request on '{host}' failed with error: %s"%str(e))
         finally:
             self.active_host = orig_host
         return response
