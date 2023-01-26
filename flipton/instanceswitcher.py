@@ -1,8 +1,3 @@
-'''
-Created on Dec 22, 2022
-
-@author: leo
-'''
 import os
 import pickle
 from pathlib import Path
@@ -11,6 +6,8 @@ from urllib3.util.url import parse_url
 from mastodon import Mastodon
 from mastodon.utility import AttribAccessList
 from mastodon.errors import MastodonError
+
+DEBUG = False
 
 # Methods not associated to a logged in user.
 # From API version 3.5.5
@@ -152,13 +149,14 @@ class MastodonInstanceSwitcher(object):
         # Successfully retrieved token
         try:
             self.clients[host] = Mastodon(**masto_args)
-        except Exception as e:
+        except MastodonError as e:
             print(f"MastodonInstanceSwitcher: Failed to instantiate client for host '{host}'")
             print("   Error: %s"%str(e))
             self.clients[host] = None
             self.active_host = None
-            
-        print(f"MastodonInstanceSwitcher: Instantiated client for host '{host}'")
+        
+        if DEBUG:
+            print(f"MastodonInstanceSwitcher: Instantiated client for host '{host}'")
         self.active_host = host
     
     
@@ -167,7 +165,7 @@ class MastodonInstanceSwitcher(object):
         if token is None:
             try:
                 token = self._create_app(host)
-            except Exception as e:
+            except MastodonError as e:
                 print("MastodonInstanceSwitcher: Error when creating app token at '%s': %s"%(host,str(e)))
                 return None
             print(f"MastodonInstanceSwitcher: Created new app token for '{host}': {token}")
@@ -210,7 +208,10 @@ class MastodonInstanceSwitcher(object):
         # Call client method
         client = self.clients[self.active_host]
         client_method = getattr(client, method_name)
-        response = client_method(**kwargs)
+        try:
+            response = client_method(**kwargs)
+        except MastodonError as e:
+            raise FliptonError(f"Error when calling '{method_name}()' at '{self.active_host}': %s"%str(e))
         return response
             
     
